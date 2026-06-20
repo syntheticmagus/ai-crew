@@ -1,0 +1,20 @@
+node_modules/
+dist/
+
+# Runtime secrets — never commit
+.tokens.json
+.tokens.json.tmp
+.process-state.json
+.process-state.json.tmp
+environments.json
+
+# Environment
+.env
+.env.local
+
+# Local Claude Code settings (machine-specific)
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db

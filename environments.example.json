@@ -1,0 +1,20 @@
+[
+  {
+    "name": "local-strix",
+    "base_url": "http://YOUR_LLM_SERVER_IP:11434/v1",
+    "api_key_env": "STRIX_API_KEY",
+    "role_suitability": ["architecture", "planning", "coding", "review", "testing"],
+    "token_cost": { "input": 0, "output": 0 },
+    "max_context": 131072,
+    "notes": "Local machine running Ollama. No key needed — set STRIX_API_KEY=ollama."
+  },
+  {
+    "name": "anthropic-claude",
+    "base_url": "https://api.anthropic.com/v1",
+    "api_key_env": "ANTHROPIC_API_KEY",
+    "role_suitability": ["architecture", "planning", "coding", "review", "testing"],
+    "token_cost": { "input": 3, "output": 15 },
+    "max_context": 200000,
+    "notes": "Anthropic Claude via OpenAI-compatible endpoint. Fallback when local is unavailable."
+  }
+]

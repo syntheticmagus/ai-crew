@@ -1,0 +1,26 @@
+{
+  "name": "ai-crew",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI software development team — polls ai_captain for projects and builds them using six specialized agents",
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "openai": "^4.77.0",
+    "simple-git": "^3.27.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
