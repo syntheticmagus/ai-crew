@@ -139,6 +139,13 @@ info()  { echo -e "\${GREEN}[INFO]\${NC} \$*"; }
 warn()  { echo -e "\${YELLOW}[WARN]\${NC} \$*" >&2; }
 error() { echo -e "\${RED}[ERROR]\${NC} \$*" >&2; }
 
+# ── Idempotency check ────────────────────────────────────────────────────────
+
+if [[ -f /root/ai-crew/.bootstrapped ]]; then
+    info "Already bootstrapped — skipping setup."
+    exit 0
+fi
+
 # ── Step 1: Install Node.js 20 ───────────────────────────────────────────────
 
 info "Installing Node.js 20..."
@@ -182,6 +189,7 @@ cat > /etc/systemd/system/ai-crew.service << '__AI_CREW_SVC_EOF__'
 [Unit]
 Description=AI Crew
 After=network.target bootstrap.service
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
@@ -203,6 +211,8 @@ info "Enabling and starting ai-crew.service..."
 systemctl daemon-reload
 systemctl enable ai-crew.service
 systemctl start ai-crew.service
+
+touch /root/ai-crew/.bootstrapped
 
 info "Done. Check status with: journalctl -u ai-crew -f"
 SCRIPT
