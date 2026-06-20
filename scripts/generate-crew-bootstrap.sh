@@ -188,7 +188,7 @@ info "Installing ai-crew.service..."
 cat > /etc/systemd/system/ai-crew.service << '__AI_CREW_SVC_EOF__'
 [Unit]
 Description=AI Crew
-After=network.target bootstrap.service
+After=network.target
 StartLimitIntervalSec=0
 
 [Service]
