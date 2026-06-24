@@ -95,12 +95,23 @@ export function loadConfig(): TeamConfig {
     console.warn(`[config] WORK_DIR does not exist: ${workDir} — it should be created before the team runs a project`)
   }
 
+  // ── Optional git-host integration ────────────────────────────────────────
+  const gitHostUrl = process.env['GIT_HOST_URL']
+  const gitHostPassword = process.env['GIT_HOST_PASSWORD']
+  if ((gitHostUrl && !gitHostPassword) || (!gitHostUrl && gitHostPassword)) {
+    throw new Error('GIT_HOST_URL and GIT_HOST_PASSWORD must both be set, or both omitted.')
+  }
+  const gitHost = gitHostUrl && gitHostPassword
+    ? { url: gitHostUrl, password: gitHostPassword }
+    : undefined
+
   return {
     server: { baseUrl: serverBaseUrl, userPassword: serverUserPassword },
     endpoints,
     workDir,
     tokensFile,
     pollIntervalMs,
+    gitHost,
   }
 }
 

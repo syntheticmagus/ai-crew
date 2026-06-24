@@ -60,6 +60,8 @@ export type TeamConfig = {
   tokensFile: string
   /** How often to poll the server in milliseconds */
   pollIntervalMs: number
+  /** Optional git-host server for automatic exfiltration of project repos */
+  gitHost?: { url: string; password: string }
 }
 
 // ── Role enum ─────────────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import simpleGit from 'simple-git'
 import { GitManager } from './git-manager'
+import { ensureGitHostRepo, sanitizeRepoName } from './git-host-client'
 
 // ── WorkspaceManager ───────────────────────────────────────────────────────────
 // Manages a container directory whose subdirectories are per-project git repos.
@@ -16,7 +17,10 @@ const INDEX_FILE = '.projects.json'
 type ProjectIndex = Record<string, string> // projectId → folder name
 
 export class WorkspaceManager {
-  constructor(private readonly workDir: string) {}
+  constructor(
+    private readonly workDir: string,
+    private readonly gitHostConfig?: { url: string; password: string },
+  ) {}
 
   /**
    * Return a GitManager scoped to the project's folder.
@@ -62,9 +66,30 @@ export class WorkspaceManager {
         await git.branch(['-m', status.current, 'main'])
       }
       console.log(`[workspace] Initialised new git repo at: ${projectPath}`)
+
+      // Set up git-host remote on first init if configured
+      if (this.gitHostConfig) {
+        try {
+          const pushUrl = await ensureGitHostRepo(
+            this.gitHostConfig.url,
+            this.gitHostConfig.password,
+            sanitizeRepoName(folderName),
+          )
+          await git.addRemote('origin', pushUrl)
+          console.log(`[workspace] git-host remote configured for ${folderName}`)
+        } catch (err) {
+          console.warn(`[workspace] Failed to set up git-host remote for ${folderName}:`, err)
+        }
+      }
     }
 
-    return new GitManager(projectPath)
+    // Compute push URL unconditionally so GitManager always knows whether to push,
+    // even on process restart when the init block above is skipped.
+    const pushRemoteUrl = this.gitHostConfig
+      ? await this.computePushUrl(this.gitHostConfig, folderName)
+      : undefined
+
+    return new GitManager(projectPath, pushRemoteUrl)
   }
 
   /**
@@ -72,6 +97,19 @@ export class WorkspaceManager {
    */
   getWorkDir(): string {
     return this.workDir
+  }
+
+  /**
+   * Compute the authenticated git-host push URL for a given folder name.
+   * Does not make any network calls — pure URL construction.
+   */
+  private async computePushUrl(
+    gitHostConfig: { url: string; password: string },
+    folderName: string,
+  ): Promise<string> {
+    const repoName = sanitizeRepoName(folderName)
+    const baseUrl = new URL(gitHostConfig.url)
+    return `${baseUrl.protocol}//${encodeURIComponent('git')}:${encodeURIComponent(gitHostConfig.password)}@${baseUrl.host}/${repoName}.git`
   }
 
   // ── Index helpers ────────────────────────────────────────────────────────────

@@ -11,7 +11,10 @@ import simpleGit, { SimpleGit } from 'simple-git'
 export class GitManager {
   private _git: SimpleGit | null = null
 
-  constructor(private readonly repoPath: string) {}
+  constructor(
+    private readonly repoPath: string,
+    private readonly pushRemoteUrl?: string,
+  ) {}
 
   private get git(): SimpleGit {
     if (!this._git) {
@@ -95,6 +98,15 @@ export class GitManager {
 
     // Delete the work branch so the next task starts fresh
     await this.git.deleteLocalBranch(branchName, true)
+
+    if (this.pushRemoteUrl) {
+      try {
+        await this.git.push(this.pushRemoteUrl, 'main')
+        console.log('[git-host] pushed main')
+      } catch (err) {
+        console.warn('[git-host] push main failed:', err)
+      }
+    }
   }
 
   /**
@@ -108,6 +120,15 @@ export class GitManager {
     }
     await this.git.checkout('main')
     await this.git.addTag(tagName)
+
+    if (this.pushRemoteUrl) {
+      try {
+        await this.git.pushTags(this.pushRemoteUrl)
+        console.log(`[git-host] pushed tag ${tagName}`)
+      } catch (err) {
+        console.warn('[git-host] push tags failed:', err)
+      }
+    }
   }
 
   /**

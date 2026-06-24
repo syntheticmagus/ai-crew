@@ -50,7 +50,7 @@ async function main(): Promise<void> {
 
   // ── Step 4: Build workspace manager ───────────────────────────────────────
   console.log(`\n[startup] Initializing workspace container at: ${config.workDir}`)
-  const workspaceManager = new WorkspaceManager(config.workDir)
+  const workspaceManager = new WorkspaceManager(config.workDir, config.gitHost)
 
   // ── Step 5: Start process ──────────────────────────────────────────────────
   console.log('\n[startup] Starting software team process...\n')
