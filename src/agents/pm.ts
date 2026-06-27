@@ -11,6 +11,7 @@ import { AgentHarness } from './base-agent'
 export class PMAgent extends AgentHarness {
   private readonly developerActorId: string
   private readonly testerActorId: string
+  private readonly sysadminActorId: string | null
 
   constructor(
     actorId: string,
@@ -21,10 +22,12 @@ export class PMAgent extends AgentHarness {
     modelName: string,
     developerActorId: string,
     testerActorId: string,
+    sysadminActorId: string | null,
   ) {
     super(actorId, openai, client, gitManager, config, modelName)
     this.developerActorId = developerActorId
     this.testerActorId = testerActorId
+    this.sysadminActorId = sysadminActorId
   }
 
   protected systemPrompt(): string {
@@ -70,7 +73,16 @@ as an attachment in the task conversation.
    - If the stage includes a user-facing UI, explicitly instruct the Tester to run Playwright E2E tests
      against the specific user flows named in the Stage Spec Definition of Done
    - MUST depend on ALL implementation task IDs (this is critical — the test task must wait for all impl tasks)
-5. **Mark your planning task complete**: post_entry with a summary, then patch_task(status=complete)
+${this.sysadminActorId ? `5. **Create a "deploy Stage N" task** assigned to the Sysadmin — but ONLY if the project is a hostable web application (serves HTTP, has a browser-facing UI, or is a web API meant to be externally accessible):
+   - create_task(board_id, {
+       description: "deploy Stage N for human testing\\n\\nProject slug: <slug>\\nBuild: npm install && npm run build (or equivalent)\\nStart: npm start (or equivalent)\\nVerify the server is reachable and report the harbor URL.",
+       assignee_actor_id: ${this.sysadminActorId},
+       status: 'inactive',
+       depends_on: [test_task_id]   ← depends on the test task completing successfully
+     })
+   - The deploy task MUST depend on the test task — deployment only happens after testing passes.
+   - If the project is a library, CLI tool, desktop app, or not externally hostable: skip this step.
+6. **Mark your planning task complete**: post_entry with a summary, then patch_task(status=complete)` : `5. **Mark your planning task complete**: post_entry with a summary, then patch_task(status=complete)`}
 
 ### Critical dependency wiring (MUST get right)
 
@@ -174,6 +186,7 @@ After creating tasks (or completing your planning task, or revising an escalated
 
 ## Team Actor IDs
 Developer Actor ID (use as assignee_actor_id for implementation tasks): ${this.developerActorId}
-Tester Actor ID (use as assignee_actor_id for the "test Stage N" task): ${this.testerActorId}`
+Tester Actor ID (use as assignee_actor_id for the "test Stage N" task): ${this.testerActorId}${this.sysadminActorId ? `
+Sysadmin Actor ID (use as assignee_actor_id for the "deploy Stage N" task): ${this.sysadminActorId}` : ''}`
   }
 }

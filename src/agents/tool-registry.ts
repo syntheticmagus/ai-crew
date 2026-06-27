@@ -79,6 +79,7 @@ const DEV_TOOLS = new Set([
   'run_shell', 'start_background_process', 'stop_process', 'kill_port',
   'git_status', 'git_diff', 'git_log', 'fetch_url',
   'search_codebase', 'clone_repo',
+  'harbor_list_apps', 'harbor_register_app', 'harbor_deregister_app',
 ])
 
 function isServerTool(name: string): boolean { return SERVER_TOOLS.has(name) }

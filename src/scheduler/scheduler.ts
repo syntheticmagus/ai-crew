@@ -16,6 +16,7 @@ const ROLE_PRIORITY: Role[] = [
   Role.Reviewer,
   Role.Developer,
   Role.Tester,
+  Role.Sysadmin,  // deployment runs only after testing passes
 ]
 
 function rolePriority(role: Role): number {
@@ -215,10 +216,14 @@ function roleForActorId(actorId: string, actorIdByRole: Record<Role, string>): R
 /**
  * V1 capacity check: is there at least one endpoint that lists the role's capability?
  * Full implementation would do a live health check; V1 just checks configuration.
+ * The Sysadmin falls back to "any endpoint available" when no 'deployment' tag is present,
+ * so existing environments.json files don't need to be updated to run deploy tasks.
  */
 function hasCapacity(role: Role, endpoints: ResolvedEndpoint[]): boolean {
   const capability = ROLE_CAPABILITY[role]
-  return endpoints.some(ep => ep.role_suitability.includes(capability))
+  if (endpoints.some(ep => ep.role_suitability.includes(capability))) return true
+  if (role === Role.Sysadmin) return endpoints.length > 0
+  return false
 }
 
 /**

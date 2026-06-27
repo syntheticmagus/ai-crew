@@ -16,6 +16,7 @@ import { PMAgent } from '../agents/pm'
 import { DeveloperAgent } from '../agents/developer'
 import { ReviewerAgent } from '../agents/reviewer'
 import { TesterAgent } from '../agents/tester'
+import { SysadminAgent } from '../agents/sysadmin'
 
 // ── SoftwareTeamProcess ────────────────────────────────────────────────────────
 // Multi-project coordinator.  The team stays alive indefinitely, bidding on new
@@ -726,6 +727,7 @@ export class SoftwareTeamProcess {
     const developerActorId  = this.tokenStore.actors[Role.Developer].actorId
     const reviewerActorId   = this.tokenStore.actors[Role.Reviewer].actorId
     const testerActorId     = this.tokenStore.actors[Role.Tester].actorId
+    const sysadminActorId   = this.tokenStore.actors[Role.Sysadmin].actorId
 
     // Helper: set inference params after construction without breaking object-literal style
     const withInference = <T extends import('../agents/base-agent').AgentHarness>(agent: T, role: Role): T => {
@@ -757,6 +759,7 @@ export class SoftwareTeamProcess {
         this.modelNameForRole(Role.PM),
         developerActorId,
         testerActorId,
+        this.config.harbor ? sysadminActorId : null,
       ), Role.PM),
       [Role.Developer]: withInference(new DeveloperAgent(
         developerActorId,
@@ -783,13 +786,30 @@ export class SoftwareTeamProcess {
         this.modelNameForRole(Role.Tester),
         developerActorId,
       ), Role.Tester),
+      [Role.Sysadmin]: withInference(new SysadminAgent(
+        sysadminActorId,
+        openaiByRole[Role.Sysadmin],
+        this.clientByRole[Role.Sysadmin],
+        placeholderGitManager, this.config,
+        this.modelNameForRole(Role.Sysadmin),
+        developerActorId,
+      ), Role.Sysadmin),
     }
   }
 
   private buildOpenAIClients(): Record<Role, OpenAI> {
     const result: Partial<Record<Role, OpenAI>> = {}
     for (const role of Object.values(Role)) {
-      const endpoint = selectEndpointForRole(role, this.config.endpoints)
+      // Primary: endpoint matching this role's capability tag
+      let endpoint = selectEndpointForRole(role, this.config.endpoints)
+      // Fallback for the Sysadmin when no 'deployment' endpoint is configured —
+      // avoids breaking existing environments.json files after the upgrade.
+      if (!endpoint && role === Role.Sysadmin) {
+        endpoint = this.config.endpoints[0] ?? null
+        if (endpoint) {
+          console.warn(`[config] No 'deployment' endpoint in environments.json — Sysadmin will use "${endpoint.name}". Add "deployment" to role_suitability to silence this warning.`)
+        }
+      }
       if (!endpoint) {
         throw new Error(`No model endpoint available for role: ${role}. Check your environments.json configuration.`)
       }

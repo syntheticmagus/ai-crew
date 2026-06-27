@@ -105,6 +105,18 @@ export function loadConfig(): TeamConfig {
     ? { url: gitHostUrl, password: gitHostPassword }
     : undefined
 
+  // ── Optional ai-harbor integration ───────────────────────────────────────
+  const harborUrl = process.env['HARBOR_URL']
+  const harborAuthToken = process.env['HARBOR_AUTH_TOKEN']
+  const harborDeployHost = process.env['HARBOR_DEPLOY_HOST']
+  const harborVarsSet = [harborUrl, harborAuthToken, harborDeployHost].filter(Boolean).length
+  if (harborVarsSet > 0 && harborVarsSet < 3) {
+    throw new Error('HARBOR_URL, HARBOR_AUTH_TOKEN, and HARBOR_DEPLOY_HOST must all be set together, or all omitted.')
+  }
+  const harbor = harborUrl && harborAuthToken && harborDeployHost
+    ? { url: harborUrl, authToken: harborAuthToken, deployHost: harborDeployHost }
+    : undefined
+
   return {
     server: { baseUrl: serverBaseUrl, userPassword: serverUserPassword },
     endpoints,
@@ -112,6 +124,7 @@ export function loadConfig(): TeamConfig {
     tokensFile,
     pollIntervalMs,
     gitHost,
+    harbor,
   }
 }
 

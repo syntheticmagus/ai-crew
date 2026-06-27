@@ -59,6 +59,13 @@ export function buildBoardSchema(actors: TokenStore['actors']): object {
         capabilities: ['testing'],
         description: 'Builds and runs the Stage in-VM. Files bugs or writes the Stage Report.',
       },
+      {
+        actor_id: actors[Role.Sysadmin].actorId,
+        display_name: 'Sysadmin',
+        title: 'Systems Administrator',
+        capabilities: ['deployment'],
+        description: 'Deploys completed Stage builds as live web apps via ai-harbor. Files deployment bugs.',
+      },
     ],
 
     /**
@@ -96,6 +103,10 @@ export function buildBoardSchema(actors: TokenStore['actors']): object {
       {
         rule: 'stage_mechanism',
         description: 'Work proceeds in Stages. Each Stage has a planning task (PM), implementation tasks (Developer→Reviewer), and a test task (Tester). Stages are bracketed by the Executive.',
+      },
+      {
+        rule: 'web_stages_require_deployment',
+        description: 'Stages producing web applications include a deploy task (Sysadmin) that depends on the test task. The stage is not complete until deployment succeeds or is explicitly skipped.',
       },
     ],
   }

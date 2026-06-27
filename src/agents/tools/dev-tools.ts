@@ -282,6 +282,60 @@ export function buildDevToolDefinitions(): OpenAI.ChatCompletionTool[] {
         },
       },
     },
+    // ── Harbor deployment ──────────────────────────────────────────────────────
+    {
+      type: 'function',
+      function: {
+        name: 'harbor_list_apps',
+        description: 'List all apps currently registered with ai-harbor (the reverse proxy registry). ' +
+          'Use before registering or deregistering to check current state.',
+        parameters: { type: 'object', properties: {}, required: [] },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'harbor_register_app',
+        description: 'Register a running web server with ai-harbor so it becomes accessible through ' +
+          'the Caddy reverse proxy. Returns the route path and optional TinyURL. ' +
+          'The host (machine IP) is injected automatically — do not pass it. ' +
+          'Call this after start_background_process confirms the server is up.',
+        parameters: {
+          type: 'object',
+          properties: {
+            name: {
+              type: 'string',
+              description: 'App name — alphanumeric and hyphens, must start with alphanumeric. ' +
+                'Use the project slug (e.g. "my-project-stage1"). Re-registering the same name updates it.',
+            },
+            port: {
+              type: 'number',
+              description: 'TCP port the server is listening on locally.',
+            },
+            description: {
+              type: 'string',
+              description: 'Optional human-readable description of the deployment.',
+            },
+          },
+          required: ['name', 'port'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'harbor_deregister_app',
+        description: 'Remove an app from ai-harbor, unregistering its Caddy route and TinyURL alias. ' +
+          'Call this before re-deploying to a new port, or when tearing down a deployment.',
+        parameters: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'App name to deregister.' },
+          },
+          required: ['name'],
+        },
+      },
+    },
     // ── Repo initialisation ────────────────────────────────────────────────────
     {
       type: 'function',
@@ -745,6 +799,55 @@ export async function dispatchDevTool(
         // Best-effort cleanup of the temporary remote
         try { await runShell('git remote remove _source', workDir, 10_000) } catch { /* ignore */ }
         return { error: String(err) }
+      }
+    }
+
+    case 'harbor_list_apps': {
+      if (!config.harbor) return { error: 'Harbor not configured — HARBOR_URL, HARBOR_AUTH_TOKEN, and HARBOR_DEPLOY_HOST are required.' }
+      try {
+        const res = await fetch(`${config.harbor.url}/api/apps`, {
+          headers: { Authorization: `Bearer ${config.harbor.authToken}` },
+          signal: AbortSignal.timeout(10_000),
+        })
+        return await res.json()
+      } catch (err) {
+        return { error: `Harbor request failed: ${String(err)}` }
+      }
+    }
+
+    case 'harbor_register_app': {
+      if (!config.harbor) return { error: 'Harbor not configured — HARBOR_URL, HARBOR_AUTH_TOKEN, and HARBOR_DEPLOY_HOST are required.' }
+      const appName = args['name'] as string
+      const appPort = args['port'] as number
+      const appDesc = args['description'] as string | undefined
+      try {
+        const res = await fetch(`${config.harbor.url}/api/apps`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${config.harbor.authToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name: appName, port: appPort, host: config.harbor.deployHost, description: appDesc }),
+          signal: AbortSignal.timeout(15_000),
+        })
+        return await res.json()
+      } catch (err) {
+        return { error: `Harbor request failed: ${String(err)}` }
+      }
+    }
+
+    case 'harbor_deregister_app': {
+      if (!config.harbor) return { error: 'Harbor not configured — HARBOR_URL, HARBOR_AUTH_TOKEN, and HARBOR_DEPLOY_HOST are required.' }
+      const appName = args['name'] as string
+      try {
+        const res = await fetch(`${config.harbor.url}/api/apps/${encodeURIComponent(appName)}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${config.harbor.authToken}` },
+          signal: AbortSignal.timeout(10_000),
+        })
+        return await res.json()
+      } catch (err) {
+        return { error: `Harbor request failed: ${String(err)}` }
       }
     }
 

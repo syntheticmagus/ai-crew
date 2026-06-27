@@ -62,6 +62,15 @@ export type TeamConfig = {
   pollIntervalMs: number
   /** Optional git-host server for automatic exfiltration of project repos */
   gitHost?: { url: string; password: string }
+  /** Optional ai-harbor integration for deploying web apps through Caddy reverse proxy */
+  harbor?: {
+    /** Base URL of the ai-harbor management server, e.g. http://localhost:8090 */
+    url: string
+    /** Bearer token matching MANAGEMENT_AUTH_TOKEN on the ai-harbor server */
+    authToken: string
+    /** LAN IP or hostname of the host machine where ai-crew runs; Caddy proxies to this */
+    deployHost: string
+  }
 }
 
 // ── Role enum ─────────────────────────────────────────────────────────────────
@@ -74,6 +83,7 @@ export enum Role {
   Developer = 'developer',
   Reviewer = 'reviewer',
   Tester = 'tester',
+  Sysadmin = 'sysadmin',
 }
 
 export const ALL_ROLES: Role[] = [
@@ -83,6 +93,7 @@ export const ALL_ROLES: Role[] = [
   Role.Developer,
   Role.Reviewer,
   Role.Tester,
+  Role.Sysadmin,
 ]
 
 /** Maps each role to the capability tag it advertises in the board schema. */
@@ -93,6 +104,7 @@ export const ROLE_CAPABILITY: Record<Role, string> = {
   [Role.Developer]: 'coding',
   [Role.Reviewer]: 'review',
   [Role.Tester]: 'testing',
+  [Role.Sysadmin]: 'deployment',
 }
 
 /** Human-readable display names submitted to the server. */
@@ -103,4 +115,5 @@ export const ROLE_DISPLAY_NAME: Record<Role, string> = {
   [Role.Developer]: 'Developer',
   [Role.Reviewer]: 'Reviewer',
   [Role.Tester]: 'Tester',
+  [Role.Sysadmin]: 'Sysadmin',
 }
