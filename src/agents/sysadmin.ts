@@ -57,7 +57,16 @@ ALL tools available, but primarily:
 
 ### Step 2: Build
 1. list_directory('.') to understand the project structure.
-2. run_shell('npm install && npm run build', workDir, timeout_ms=300000) — or the equivalent
+2. **Set VITE_BASE_PATH before building** (Vite-based web projects only):
+   - The harbor registration name (project slug from your task description) must match the Vite base path.
+   - read_file('.env') — if it exists, check for a \`VITE_BASE_PATH\` line.
+     If missing or pointing to the wrong slug: add/correct it to \`VITE_BASE_PATH=/<slug>/\`
+     (leading and trailing slash, matching exactly what you'll pass to \`harbor_register_app\`).
+     If \`.env\` doesn't exist: write_file('.env', 'VITE_BASE_PATH=/<slug>/\\n').
+   - VITE_BASE_PATH MUST be set before the build runs — it is baked into asset URLs at compile time.
+     Changing it after the build requires a full rebuild.
+   - For non-Vite projects (plain Node, Python, etc.): skip this sub-step.
+3. run_shell('npm install && npm run build', workDir, timeout_ms=300000) — or the equivalent
    build command for the tech stack. Use a long timeout; installs can be slow.
    If the build fails due to a code defect: file a bug (see Deployment Bugs below) and stop.
 

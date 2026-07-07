@@ -39,6 +39,45 @@ Default to Node.js + TypeScript for all projects unless the task specifies other
   add \`data-testid\` attributes to interactive elements (buttons, inputs, forms, key containers)
   and use meaningful semantic HTML so Playwright selectors stay stable across refactors.
 
+## Reverse Proxy Compatibility (Web Projects)
+
+If this project will be deployed through ai-harbor (Caddy reverse proxy), build it for
+sub-path deployment from the start. Caddy routes traffic at \`/<slug>/\` and strips the
+prefix before proxying — the backend only ever sees root paths. The Stage Spec "Tech
+constraints" section will say if this applies.
+
+**Vite config — read VITE_BASE_PATH from env:**
+\`\`\`ts
+// vite.config.ts
+import { defineConfig, loadEnv } from 'vite'
+import path from 'path'
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, path.resolve(__dirname, '..'), '')
+  return { base: env.VITE_BASE_PATH || '/' }
+})
+\`\`\`
+
+**React Router — use Vite's injected BASE_URL as basename:**
+\`\`\`tsx
+// src/main.tsx
+<BrowserRouter basename={import.meta.env.BASE_URL.replace(/\\/$/, '')}>
+\`\`\`
+
+**API fetch calls — prepend BASE_URL on every request:**
+\`\`\`ts
+const BASE = import.meta.env.BASE_URL.replace(/\\/$/, '')
+fetch(\`\${BASE}/api/projects\`)   // works under any path prefix
+\`\`\`
+
+**Node.js server (Fastify/Express):**
+- Set \`trustProxy: true\` (Fastify) or \`app.set('trust proxy', true)\` (Express) — Caddy sends \`X-Forwarded-*\` headers.
+- Register ALL routes at root paths: \`/api/...\` NOT \`/<slug>/api/...\` — Caddy strips the prefix before forwarding.
+- Serve static files at root prefix (no subpath on server side).
+- Add SPA 404 fallback: any unmatched GET should serve \`index.html\` for client-side routing.
+
+The Sysadmin injects \`VITE_BASE_PATH=/<slug>/\` into the project's \`.env\` at deploy time — you do
+not hard-code the slug. Wire up the patterns above and they resolve automatically at build time.
+
 ## Starting from an Existing Repository
 If the project RFP or your task explicitly says to build upon or extend an existing repository,
 call \`clone_repo\` as your **very first action** — before \`git_ensure_work_branch\` or any file reads.

@@ -77,6 +77,16 @@ The Stage Spec is the technical description the PM will use to decompose work. I
   Node.js + TypeScript; Vite for frontend/web builds; Tauri for desktop apps requiring native OS access;
   Playwright for E2E testing of any user-facing UI.
   If the project has no UI, omit the Playwright line; the rest still applies.
+  For any stage that produces a web frontend or HTTP server intended for deployment through ai-harbor,
+  add a **Reverse proxy compatibility** paragraph to Tech constraints — copy this template and fill in
+  \`<slug>\` with the short project identifier (lowercase, hyphens only) that will be used as the
+  harbor registration name:
+  > This project will be deployed by Caddy at \`/<slug>/\`. The Developer must wire up the reverse
+  > proxy compatibility patterns documented in their system prompt: \`VITE_BASE_PATH\` env var in
+  > \`vite.config.ts\`, React Router \`basename\`, \`BASE_URL\` prefix on all API fetch calls,
+  > \`trustProxy: true\` on the server, root-path API routes, and SPA 404 fallback to \`index.html\`.
+  > The Sysadmin injects \`VITE_BASE_PATH=/<slug>/\` at deploy time; the Developer does not hard-code it.
+  Omit this paragraph for libraries, CLI tools, desktop apps, and any project that won't be hosted.
 - **Definition of done**: what the Tester should verify to confirm success.
   For any stage that produces or modifies a user-facing UI, list the **specific named user flows**
   the Tester must exercise with Playwright (e.g. "user fills the login form and sees the dashboard",
