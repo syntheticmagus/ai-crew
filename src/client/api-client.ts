@@ -13,7 +13,7 @@ export type Project = {
 }
 export type Proposal = {
   id: string; projectId: string; authorAgentId: string; content: string
-  conversationId: string; createdAt: string; updatedAt: string
+  teamName?: string; conversationId: string; createdAt: string; updatedAt: string
 }
 export type Board = {
   id: string; projectId: string; teamAgentId: string; activeSchemaVersion: number
@@ -200,6 +200,13 @@ export class ApiClient {
     })
   }
 
+  patchActorDisplayName(actorId: string, displayName: string): Promise<Actor> {
+    return this.apiFetch(`/api/actors/${actorId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ display_name: displayName }),
+    })
+  }
+
   createActorToken(actorId: string): Promise<{ token: string }> {
     return this.apiFetch(`/api/actors/${actorId}/tokens`, { method: 'POST', body: JSON.stringify({}) })
   }
@@ -243,10 +250,10 @@ export class ApiClient {
     return this.apiFetch(`/api/projects/${projectId}/proposals?` + new URLSearchParams(params))
   }
 
-  createProposal(projectId: string, content: string): Promise<Proposal> {
+  createProposal(projectId: string, content: string, teamName?: string): Promise<Proposal> {
     return this.apiFetch(`/api/projects/${projectId}/proposals`, {
       method: 'POST',
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, ...(teamName ? { team_name: teamName } : {}) }),
     })
   }
 

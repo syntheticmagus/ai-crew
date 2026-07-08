@@ -257,6 +257,7 @@ export async function dispatchServerTool(
   name: string,
   args: Record<string, unknown>,
   client: ApiClient,
+  config?: import('../../config/types').TeamConfig,
 ): Promise<unknown> {
   switch (name) {
     case 'get_project': {
@@ -270,6 +271,7 @@ export async function dispatchServerTool(
       return client.createProposal(
         args['project_id'] as string,
         args['content'] as string,
+        config?.teamIdentity?.teamName,
       )
     }
     case 'patch_proposal': {

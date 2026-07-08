@@ -30,10 +30,19 @@ async function main(): Promise<void> {
   console.log('\n[startup] Ensuring agent actors are provisioned...')
   const actorStore = new ActorStore(config.tokensFile)
   const tokenStore = await actorStore.ensure(config.server.baseUrl, config.server.userPassword)
+  console.log(`[startup] Team: ${tokenStore.teamName}`)
   console.log(`[startup] All agents ready:`)
   for (const role of ALL_ROLES) {
     const record = tokenStore.actors[role]
     console.log(`  ${role}: ${record.displayName} (${record.actorId})`)
+  }
+
+  // Inject team identity into config so agents can use their names in prompts.
+  config.teamIdentity = {
+    teamName: tokenStore.teamName,
+    agentPersonalNames: Object.fromEntries(
+      ALL_ROLES.map(role => [tokenStore.actors[role].actorId, tokenStore.actors[role].personalName])
+    ),
   }
 
   // ── Step 3: Build per-role API clients ─────────────────────────────────────

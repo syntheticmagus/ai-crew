@@ -71,6 +71,16 @@ export type TeamConfig = {
     /** LAN IP or hostname of the host machine where ai-crew runs; Caddy proxies to this */
     deployHost: string
   }
+  /**
+   * Generated team identity — populated from .tokens.json after bootstrap.
+   * Undefined if the token store hasn't been loaded yet.
+   */
+  teamIdentity?: {
+    /** Team name generated at first bootstrap, e.g. "Affable Sparks" */
+    teamName: string
+    /** Maps each actor's server ID → their personal first name */
+    agentPersonalNames: Record<string, string>
+  }
 }
 
 // ── Role enum ─────────────────────────────────────────────────────────────────

@@ -44,7 +44,7 @@ export async function dispatchTool(
   try {
     // Route to the correct implementation
     if (isServerTool(name)) {
-      return await dispatchServerTool(name, args, client)
+      return await dispatchServerTool(name, args, client, config)
     }
     if (isGitManagerTool(name)) {
       return await dispatchGitManagerTool(name, args, gitManager)

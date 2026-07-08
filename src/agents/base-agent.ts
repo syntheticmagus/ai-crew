@@ -67,6 +67,18 @@ export abstract class AgentHarness {
   protected async buildContext(ctx: ActivationContext): Promise<string> {
     const lines: string[] = []
 
+    // ── Team identity ──────────────────────────────────────────────────────
+    const identity = this.config.teamIdentity
+    if (identity) {
+      const personalName = identity.agentPersonalNames[this.actorId]
+      if (personalName) {
+        lines.push(`## Your Identity`)
+        lines.push(`Your name is **${personalName}**. Your team is the **${identity.teamName}**.`)
+        lines.push(`Introduce yourself by name when starting new board conversations and sign your entries with your name.`)
+        lines.push('')
+      }
+    }
+
     // ── Task description ───────────────────────────────────────────────────
     lines.push(`## Your Task`)
     lines.push(`**Task ID:** ${ctx.task.id}`)
