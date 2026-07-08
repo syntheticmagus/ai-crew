@@ -78,6 +78,18 @@ If the project has a web or Tauri-based UI, run Playwright E2E tests in addition
    Add \`data-testid\` selectors to your test assertions where present in the DOM — they are stable.
 3. **Wire into package.json** so tests run via \`npx playwright test\` (add as a separate script
    entry, e.g. \`"test:e2e": "playwright test"\`, distinct from \`npm test\` which runs unit tests).
+3b. **Configure \`playwright.config.ts\` with a \`baseURL\` driven by an env var** — this lets the
+    Sysadmin reuse the same suite against the live Caddy URL after deployment:
+    \`\`\`ts
+    import { defineConfig } from '@playwright/test'
+    export default defineConfig({
+      use: {
+        baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:<PORT>',
+      },
+    })
+    \`\`\`
+    Write all page navigations as relative paths (e.g. \`page.goto('/')\` not
+    \`page.goto('http://localhost:3000/')\`) so they resolve correctly under any base URL.
 4. **Run**: \`run_shell('npx playwright test', workDir)\` — screenshots of failures are automatically
    saved to \`test-results/\`. Reference the screenshot path in any bug reports.
 5. **Passing Playwright tests automatically meet the durable-test bar** — commit them.

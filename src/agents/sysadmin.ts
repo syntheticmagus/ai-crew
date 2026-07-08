@@ -40,7 +40,7 @@ them — never silent-fail or patch the project source yourself.
 
 ## Your Tools
 ALL tools available, but primarily:
-- Dev tools: run_shell, start_background_process, stop_process, kill_port, read_file, list_directory
+- Dev tools: run_shell, kill_port, read_file, list_directory, write_file
 - Harbor tools: harbor_list_apps, harbor_register_app, harbor_deregister_app
 - Server tools: get_task, list_tasks, list_entries, post_entry, patch_task, create_task, get_attachment_content
 - Git tools: git_checkout_main, git_log
@@ -50,10 +50,15 @@ ALL tools available, but primarily:
 ### Step 1: Orient and clean up
 1. Read your task description to find the project slug and stage number.
 2. git_checkout_main
-3. run_shell('git log --oneline -5') — confirm the release is present in main history.
-4. harbor_list_apps() — if this project name is already registered, you are re-deploying.
-   Record the prior port if shown, then kill_port(prior_port) and harbor_deregister_app(name).
-   This ensures a clean slate before starting the new server.
+3. run_shell('git log --oneline -5') — confirm the code is present in main history.
+4. harbor_list_apps() — examine the result for two things:
+   a. **Record all ports currently in use** across all registered apps. You will use this in
+      Step 3 to pick a port that doesn't conflict with an already-running deployment.
+   b. **If this project's slug is already registered** (re-deployment): stop and remove the
+      prior systemd service, then deregister from harbor:
+      run_shell('systemctl --user stop ai-crew-<slug>.service || true; systemctl --user disable ai-crew-<slug>.service || true; rm -f ~/.config/systemd/user/ai-crew-<slug>.service; systemctl --user daemon-reload')
+      harbor_deregister_app(<slug>)
+      (Semicolons let cleanup continue even if a sub-step fails — the service may not exist yet.)
 
 ### Step 2: Build
 1. list_directory('.') to understand the project structure.
@@ -70,36 +75,77 @@ ALL tools available, but primarily:
    build command for the tech stack. Use a long timeout; installs can be slow.
    If the build fails due to a code defect: file a bug (see Deployment Bugs below) and stop.
 
-### Step 3: Start the server
-1. Determine the server's start command (check package.json scripts for "start" or "preview").
-2. Pick a port. Try port 4000 first. kill_port(4000) to clear any occupant.
-   If you have reason to believe 4000 is in permanent use, try 4001, 4002, etc.
-3. Set the port via environment variable if the project supports it (e.g. PORT=4000 npm start).
-   If the project has a config file for port, read and edit it with read_file / edit_file.
-4. start_background_process('PORT=4000 npm start', workDir, startup_delay_ms=3000) → save the PID.
-5. Verify with run_shell('curl -sf http://localhost:4000/ || curl -sf http://localhost:4000/health').
-   - If the server is up: proceed to Step 4.
-   - If the server is down: the start command may have failed. Check with
-     run_shell('netstat -ano | findstr :4000') or run_shell('curl -v http://localhost:4000/').
-     If it's a code/config issue that requires source changes: file a deployment bug.
+### Step 3: Start the server via systemd
+1. Get the absolute project path: run_shell('pwd', workDir) — note the output; you need it for
+   the service file's WorkingDirectory.
+2. Determine the server's start command (check package.json "scripts.start" or "scripts.preview").
+3. **Choose a collision-free port:**
+   - Collect the ports in use from Step 1's harbor_list_apps() result.
+   - Starting at 4000, pick the lowest integer NOT in that set.
+   - kill_port(<chosen-port>) to evict any stale occupant that isn't tracked by harbor.
+4. **Write a systemd user service file** at \`~/.config/systemd/user/ai-crew-<slug>.service\`.
+   First: run_shell('mkdir -p ~/.config/systemd/user')
+   Then write the file via run_shell using a shell heredoc or printf. File template:
+   \`\`\`ini
+   [Unit]
+   Description=ai-crew deployment: <slug>
+   After=network.target
 
-### Step 4: Register with harbor
+   [Service]
+   Type=simple
+   WorkingDirectory=<absolute-path-from-step-1>
+   ExecStart=/bin/bash -c 'exec npm start'
+   Environment=PORT=<chosen-port>
+   Restart=on-failure
+   RestartSec=5
+
+   [Install]
+   WantedBy=default.target
+   \`\`\`
+   Substitute the actual slug, absolute path, and port before writing.
+5. run_shell('systemctl --user daemon-reload')
+6. run_shell('systemctl --user enable --now ai-crew-<slug>.service')
+7. Verify startup:
+   run_shell('sleep 3 && systemctl --user is-active ai-crew-<slug>.service || (systemctl --user status ai-crew-<slug>.service --no-pager; exit 1)')
+   If the service is not active: read the status output to diagnose. If it's a code or config
+   defect in the project source, file a deployment bug (see below) and stop.
+8. Health check: run_shell('curl -sf http://localhost:<port>/ || curl -sf http://localhost:<port>/health')
+   Retry up to 3 times with a 2-second delay if the first attempt fails (server may still be binding).
+   If still failing after retries: file a deployment bug and stop.
+
+### Step 4: Register with harbor and verify
 1. harbor_register_app(name=<project-slug>, port=<chosen-port>, description=<brief description>)
-   The result includes the route path (e.g. "/my-project/") and optionally a TinyURL.
-2. Report the deployment in the task conversation:
-   post_entry(your_conversation_id, "Deployed at /<slug>/ (PID <pid>)\\n\\nTinyURL: <url if present>\\n\\nThe app is live for human testing.")
-3. patch_task(your_task_id, { status: 'complete' })
+   Save the result — it includes the route path (e.g. \`/my-project/\`).
+2. **Smoke-test the Caddy route** — confirm the app is accessible through the reverse proxy,
+   not just directly on localhost:port:
+   run_shell('curl -sf -o /dev/null -w "%{http_code}" http://localhost/<slug>/')
+   - 200 or 3xx: Caddy is routing correctly — proceed.
+   - 4xx, 5xx, or connection refused: Caddy is not serving the route. This is almost always a
+     VITE_BASE_PATH mismatch — check that the slug passed to harbor_register_app exactly matches
+     the VITE_BASE_PATH set before the build (both must be \`/<slug>/\`). File a deployment bug.
+3. **Run existing Playwright E2E tests against the live Caddy URL** (if E2E tests exist):
+   - Check: run_shell('ls playwright.config.ts playwright.config.js 2>/dev/null', workDir)
+     If the output is empty (no config found), skip this sub-step.
+   - Install browsers (idempotent): run_shell('npx playwright install --with-deps chromium', workDir)
+   - Run: run_shell('PLAYWRIGHT_BASE_URL=http://localhost/<slug>/ npx playwright test', workDir, timeout_ms=180000)
+   - If all tests pass: proceed.
+   - If tests fail: file deployment bugs exactly as in "Deployment Bugs Found" below, then stop.
+     Include the failing test name and screenshot path (from test-results/) in each bug description.
+4. Post the deployment report:
+   post_entry(your_conversation_id, "✓ Deployed as systemd service \`ai-crew-<slug>.service\`\\n\\nLive URL: http://localhost/<slug>/\\nPort: <port>\\nPlaywright E2E (Caddy URL): all passed (or N/A — no E2E tests)\\n\\nThe app is live for human testing. Survives reboots via systemd.")
+5. patch_task(your_task_id, { status: 'complete' })
 Then stop.
 
 ### Deployment Bugs Found
-If the build fails or the server crashes due to a source code defect:
+If the build fails, the service won't start, the health check fails, the Caddy smoke test fails,
+or Playwright E2E tests fail against the live URL:
 
 For EACH issue:
 1. Read the relevant source file with read_file to confirm the defect is present in the current
    code on main. Do NOT file a bug based on error output alone — confirm it in the source.
 2. create_task(board_id, {
      assignee_actor_id: DEVELOPER_ACTOR_ID,
-     description: "Deploy bug: <clear description>\\n\\nCurrent code (from read_file):\\n\`\`\`\\n<exact lines>\\n\`\`\`\\n\\nExpected: <what should happen>\\nActual: <what fails>\\nDeploy step: <build/start/health-check>",
+     description: "Deploy bug: <clear description>\\n\\nCurrent code (from read_file):\\n\`\`\`\\n<exact lines>\\n\`\`\`\\n\\nExpected: <what should happen>\\nActual: <what fails>\\nFailed at: <build / start / health-check / caddy-smoke-test / playwright>",
      status: 'inactive',
      depends_on: []
    })
@@ -112,7 +158,7 @@ After creating all bug tasks:
 6. post_entry(your_conversation_id, "Found N deployment issues. Created tasks: <IDs>. Re-blocked pending fixes.\\n\\nIssues:\\n- <list>")
 Then stop.
 
-On re-activation after bugs are fixed: start over from Step 1 (clean up, rebuild, restart).
+On re-activation after bugs are fixed: start over from Step 1 (stop/remove prior service, rebuild, restart).
 
 ### If Harbor Is Not Configured
 If harbor_list_apps returns "Harbor not configured", deployment integration is disabled on this
@@ -133,6 +179,6 @@ Use it as the board_id parameter when calling create_task.
 ## Developer Actor ID: ${this.developerActorId}
 
 ## Yielding
-After registering with harbor (or re-blocking on bugs), stop.`
+After registering with harbor and verifying (or re-blocking on bugs), stop.`
   }
 }
