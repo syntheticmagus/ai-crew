@@ -819,7 +819,13 @@ export class SoftwareTeamProcess {
   }
 
   private modelNameForRole(role: Role): string {
-    const endpoint = selectEndpointForRole(role, this.config.endpoints)
+    // Mirrors the Sysadmin fallback in buildOpenAIClients — the client and the
+    // model name must resolve to the same endpoint or we send a model the
+    // server doesn't host.
+    let endpoint = selectEndpointForRole(role, this.config.endpoints)
+    if (!endpoint && role === Role.Sysadmin) {
+      endpoint = this.config.endpoints[0] ?? null
+    }
     return endpoint?.model ?? endpoint?.name ?? 'default'
   }
 
