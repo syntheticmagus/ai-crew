@@ -170,6 +170,22 @@ cat > /root/ai-crew/.env << '__AI_CREW_ENV_EOF__'
 ${dot_env}
 __AI_CREW_ENV_EOF__
 
+# ── Step 3b: Inject this VM's LAN IP as HARBOR_DEPLOY_HOST ────────────────────
+# ai-harbor's Caddy (on the host box) reverse-proxies to deployed apps, which run
+# here on this VM. It must dial this VM's own LAN IP, so detect it at bootstrap
+# time and substitute it for the __HARBOR_DEPLOY_HOST__ sentinel in .env.
+if grep -q '__HARBOR_DEPLOY_HOST__' /root/ai-crew/.env; then
+    info "Detecting LAN IP for HARBOR_DEPLOY_HOST..."
+    DEPLOY_HOST="\$(ip -4 route get 1.1.1.1 2>/dev/null | grep -oP 'src \K[0-9.]+')"
+    [[ -z "\$DEPLOY_HOST" ]] && DEPLOY_HOST="\$(hostname -I | awk '{print \$1}')"
+    if [[ -z "\$DEPLOY_HOST" ]]; then
+        warn "Could not detect LAN IP — set HARBOR_DEPLOY_HOST manually in /root/ai-crew/.env"
+    else
+        sed -i "s|__HARBOR_DEPLOY_HOST__|\${DEPLOY_HOST}|" /root/ai-crew/.env
+        info "HARBOR_DEPLOY_HOST set to \${DEPLOY_HOST}"
+    fi
+fi
+
 # ── Step 4: Write environments.json ─────────────────────────────────────────
 
 info "Writing environments.json..."
